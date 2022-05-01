@@ -182,6 +182,9 @@ for (row in 1:nrow(suspects)) {
 ```{r}
 subset_df <- cleaned_df %>%
    dplyr::select(year, type, region, gender, last_fm_listeners, artist_appearances, rank, forcast, mean_word_syllables)
+subset_df$log_listeners <- log(last_fm_listeners)
+subset_df$log_artist_appearances <- log(artist_appearances)
+subset_df$log_mean_word_syllables <- log(mean_word_syllables)
 attach(subset_df)
 ```
 
@@ -190,15 +193,33 @@ attach(subset_df)
 ```{r}
 hist(last_fm_listeners, main="Histogram of Last.fm Listeners", xlab="Last.fm Listeners", ylab = "Frequency", cex.main = 1, cex.lab = 1)
 ```
-## BoxPlot
+```{r}
+hist(log_listeners, main="Histogram of Log Last.fm Listeners", xlab="Last.fm Listeners", ylab = "Frequency", cex.main = 1, cex.lab = 1)
+```
+## Scatterplot
 ```{r}
 plot(last_fm_listeners ~ rank, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
 ```
+
+```{r}
+plot(log_listeners ~ rank, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+```
+
 ```{r}
 plot(last_fm_listeners ~ year, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
 ```
+
+```{r}
+plot(log_listeners ~ year, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+```
+
+## BoxPlot
 ```{r}
 boxplot(mean_word_syllables, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+```
+
+```{r}
+boxplot(log_mean_word_syllables, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
 ```
 
 ```{r}
