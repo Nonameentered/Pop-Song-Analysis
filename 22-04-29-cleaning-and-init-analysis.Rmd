@@ -21,6 +21,7 @@ library(RecordLinkage)
 library(stringdist)
 library(devtools)
 library(quanteda)
+library(quanteda.textstats)
 ```
 
 ```{r}
@@ -75,12 +76,13 @@ dim(cleaned_df)
 unique(cleaned_df$gender)
 cleaned_df <- cleaned_df %>% 
     mutate(gender = replace(gender, gender == "other", "non-binary"))
-# Alternative
-# cleaned_df <- cleaned_df %>%
-#   mutate(gender = recode(gender, "non" = 'non-binary'))
+# Alternative, use recode
 cleaned_df <- cleaned_df %>% 
     mutate(gender = replace(gender, is.na(gender), "group"))
-unique(cleaned_df$gender)
+cleaned_df %>% count(gender)
+# Since the number of non-binary singers is small, we unfortunately remove them as we are unlikely to find strong conclusions about them
+cleaned_df <- cleaned_df %>% filter(gender != "non-binary")
+dim(cleaned_df)
 ```
 
 ### area.name -> country
@@ -100,6 +102,10 @@ cleaned_df %>% count(region)
 ## Type
 ```{r}
 unique(cleaned_df$type)
+cleaned_df %>% count(type)
+dim(cleaned_df)
+cleaned_df <- cleaned_df %>% filter(type %in% c("Group", "Person"))
+dim(cleaned_df)
 ```
 
 ## Filter out Mismatches in Lyrics
@@ -117,18 +123,84 @@ cleaned_df$cleaned_lyrics <-
   str_replace_all(., 'Best Songs of ', NA_character_) %>%
   str_replace_all(., "[0-9]+ U S", NA_character_) %>% # Court Cases
   str_replace_all(., "[0-9]+ U.S", NA_character_) %>% # Court Cases
-  # keep only alphabet letters and numbers ("al" and "num")
-  str_replace_all(., "[^[:alnum:]]", " ") %>%
-  # make multiple spaces into one space
   str_replace_all(.,"[ ]+", " ") %>%
-  str_replace(., ".*Lyrics", "")
+  str_replace(., ".*Lyrics", "") %>%
+  str_replace(., "[0-9]*Embed$", "")
+
 cleaned_df <- cleaned_df %>%
   filter(!is.na(cleaned_lyrics)) %>%
   filter(levenshteinSim(track, str_match(lyrics, "(.*)Lyrics")[,2]) > .5) %>% # There are some false positives, when there are other languages
   as.data.frame()
+
+# Filter away songs with less than 100 chars, must have been a mistake in lyrics
+cleaned_df <- cleaned_df %>% filter(nchar(cleaned_lyrics) > 100)
 dim(cleaned_df)
 ```
 
+## Readability
+```{r}
+cleaned_corpus <- corpus(
+  cleaned_df,
+  docid_field = "track_id",
+  text_field = "cleaned_lyrics",
+  unique_docnames = TRUE
+)
+```
 
+```{r}
+# We use FORCAST because it's one of the only readability metrics that don't look for sentences
+cleaned_df$forcast <- textstat_readability(
+  cleaned_corpus,
+  measure = "FORCAST",
+  min_sentence_length = 3,
+  max_sentence_length = 10000,
+)$FORCAST
+cleaned_df$mean_word_syllables <- textstat_readability(
+  cleaned_corpus,
+  measure = "meanWordSyllables",
+  remove_hyphens = TRUE,
+  min_sentence_length = 3,
+  max_sentence_length = 10000,
+)$meanWordSyllables
+```
 
-## Create Readability
+### Evaluate Readability
+```{r, eval=FALSE}
+suspects <- (cleaned_df %>% 
+               filter(forcast > 12) %>% 
+               arrange(forcast) %>%
+               select(artist, track, cleaned_lyrics, forcast))
+suspects
+for (row in 1:nrow(suspects)) {
+  print(paste(suspects[row, "track"], " - ", suspects[row, "artist"], suspects[row, "forcast"]))
+  print(suspects[row, "cleaned_lyrics"])
+}
+```
+
+## Filter to Relevant Details
+
+```{r}
+subset_df <- cleaned_df %>%
+   dplyr::select(year, type, region, gender, last_fm_listeners, artist_appearances, rank, forcast, mean_word_syllables)
+attach(subset_df)
+```
+
+# Graphics
+## Histogram
+```{r}
+hist(last_fm_listeners, main="Histogram of Last.fm Listeners", xlab="Last.fm Listeners", ylab = "Frequency", cex.main = 1, cex.lab = 1)
+```
+## BoxPlot
+```{r}
+plot(last_fm_listeners ~ rank, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+```
+```{r}
+plot(last_fm_listeners ~ year, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+```
+```{r}
+boxplot(mean_word_syllables, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+```
+
+```{r}
+boxplot(mean_word_syllables ~ gender, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+```
