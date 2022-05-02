@@ -22,6 +22,9 @@ library(stringdist)
 library(devtools)
 library(quanteda)
 library(quanteda.textstats)
+library(car)
+library(leaps)
+source("http://www.reuningscherer.net/s&ds230/Rfuncs/regJDRS.txt")
 ```
 
 ```{r}
@@ -41,7 +44,7 @@ dfArtists[dfArtists == "nan"] <- NA
 # type (Person, Group, Orchestra, more (?))
 # area.name <- looks like there are some states here, but mostly countries!
 dfArtistsInterest <- dfArtists %>%
-   dplyr::select(artist_id, type, area.name, gender) %>%
+   dplyr::select(artist_id, type, gender) %>%
    # the objects need to be class "data frame" 
    as.data.frame()
 ```
@@ -55,9 +58,9 @@ dfSongsArtists <- merge(dfSongs,dfArtistsInterest,by="artist_id")
 cleaned_df <-dfSongsArtists %>%
   filter(!is.na(lyrics))  %>%
   filter(!is.na(artist))  %>%
-  filter(!is.na(area.name))  %>%
   # filter(!is.na(gender))  %>%
   filter(!is.na(type))  %>%
+  filter(!is.na(last_fm_listeners))  %>%
   as.data.frame()
 ```
 
@@ -83,20 +86,6 @@ cleaned_df %>% count(gender)
 # Since the number of non-binary singers is small, we unfortunately remove them as we are unlikely to find strong conclusions about them
 cleaned_df <- cleaned_df %>% filter(gender != "non-binary")
 dim(cleaned_df)
-```
-
-### area.name -> country
-```{r}
-unique(cleaned_df$area.name)
-cleaned_df <- cleaned_df %>% 
-    mutate(country = recode(area.name, "Los Angeles" = "United States", "Boston" = "United States", "Malvern" = "United States", "Olympia Fields" = "United States", "Alpharetta" = "United States", "Atlanta" = "United States", "Nordrhein-Westfalen" = "Germany", "Saddle River" = "United States", "Florida" = "United States", "Hollywood" = "United States", "Manhattan" = "United States", "Vancouver" = "Canada", "Portland" = "United States", "Quebec" = "Canada", "New York" = "United States", "Hawaii" = "United States", "Devon" = "United States", "Toronto" = "Canada", "[Worldwide]" = "Worldwide", "London" = "United Kingdom", "British Virgin Islands" = "United Kingdom", "Brooklyn" = "United States", "Ann Arbor" = "United States", "Salt Lake City" = "United States", "Rome" = "Italy", "Nashville" = "United States", "Chicago" = "United States", "Houston" = "United States", "Scotland" = "United Kingdom", "England" = "United Kingdom", "Puerto Rico" = "United States"))
-cleaned_df %>% count(country)
-cleaned_df <- cleaned_df %>% 
-    mutate(region = recode(country, "Austria" = "Non-UK Europe", "Belgium" = "Non-UK Europe", "Austria" = "Non-UK Europe", "Denmark" = "Non-UK Europe", "Finland" = "Non-UK Europe", "France" = "Non-UK Europe", "Germany" = "Non-UK Europe", "Greece" = "Non-UK Europe", "Iceland" = "Non-UK Europe", "Ireland" = "Non-UK Europe", "Italy" = "Non-UK Europe", "Moldova" = "Non-UK Europe", "Netherelands" = "Non-UK Europe", "Norway" = "Non-UK Europe", "Romania" = "Non-UK Europe", "Russia" = "Non-UK Europe", "Switzerland" = "Non-UK Europe", "Sweden" = "Non-UK Europe", "Spain" = "Non-UK Europe", "Netherlands" = "Non-UK Europe", "Senegal" = "Africa", "Guinea" = "Africa", "Jamaica" = "Africa", "Morocco" = "Africa", "South Africa" = "Africa", "Bahamas" = "Non-Canada/US Americas", "Barbados" = "Non-Canada/US Americas", "Jamaica" = "Non-Canada/US Americas", "Colombia" = "Non-Canada/US Americas", "Panama" = "Non-Canada/US Americas", "Saint Vincent and The Grenadines" = "Non-Canada/US Americas", "Japan" = "Misc", "South Korea" = "Misc", "Worldwide" = "Misc", "Philippines" = "Misc", "Australia" = "Oceania", "New Zealand" = "Oceania"))
-cleaned_df %>% count(region)
-cleaned_df <- cleaned_df %>% 
-    mutate(region = recode(region, "Africa" = "Misc", "Non-Canada/US Americas" = "Misc", "Oceania" = "Misc"))
-cleaned_df %>% count(region)
 ```
 
 ## Type
@@ -181,48 +170,151 @@ for (row in 1:nrow(suspects)) {
 
 ```{r}
 subset_df <- cleaned_df %>%
-   dplyr::select(year, type, region, gender, last_fm_listeners, artist_appearances, rank, forcast, mean_word_syllables)
-subset_df$log_listeners <- log(last_fm_listeners)
-subset_df$log_artist_appearances <- log(artist_appearances)
-subset_df$log_mean_word_syllables <- log(mean_word_syllables)
+   dplyr::select(year, type, gender, last_fm_listeners, artist_appearances, rank, forcast, mean_word_syllables)
+subset_df$log_listeners <- log(subset_df$last_fm_listeners)
+subset_df$log_artist_appearances <- log(subset_df$artist_appearances)
+subset_df$log_mean_word_syllables <- log(subset_df$mean_word_syllables)
 attach(subset_df)
 ```
 
 # Graphics
-## Histogram
+## Histograms
 ```{r}
-hist(last_fm_listeners, main="Histogram of Last.fm Listeners", xlab="Last.fm Listeners", ylab = "Frequency", cex.main = 1, cex.lab = 1)
+hist(last_fm_listeners, main="Histogram of Last.fm listeners", xlab="Last.fm listeners", ylab = "Frequency", cex.main = 1, cex.lab = 1, col = "blue")
 ```
 ```{r}
-hist(log_listeners, main="Histogram of Log Last.fm Listeners", xlab="Last.fm Listeners", ylab = "Frequency", cex.main = 1, cex.lab = 1)
+hist(log_listeners, main="Histogram of Log Last.fm listeners", xlab="Last.fm listeners", ylab = "Frequency", cex.main = 1, cex.lab = 1, col = "blue")
 ```
-## Scatterplot
+## Scatterplots
 ```{r}
-plot(last_fm_listeners ~ rank, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
-```
-
-```{r}
-plot(log_listeners ~ rank, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+plot(last_fm_listeners ~ rank, main = "Last.fm listeners versus Rank", xlab = "Rank", ylab = "Last.fm listeners", cex.main = 1, 
+     cex.lab = 1, col = "red")
 ```
 
 ```{r}
-plot(last_fm_listeners ~ year, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+plot(log_listeners ~ rank, main="Log Last.fm listeners versus Rank", xlab = "Rank", ylab = "Log Last.fm listeners", cex.main = 1,
+     cex.lab = 1, col = "red")
+```
+
+```{r}
+plot(last_fm_listeners ~ year, main = "Last.fm listeners versus Year", xlab = "Year", ylab = "Last.fm listeners", cex.main = 1, 
+     cex.lab = 1, col = "red")
 ```
 
 
 ```{r}
-plot(mean_word_syllables ~ year, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+plot(mean_word_syllables ~ year, main = "Mean word syllables versus Year", xlab = "Year", ylab = "Mean word syllables", cex.main = 1,
+     cex.lab = 1, col = "red")
 ```
 
-## BoxPlot
+## Boxplots
 ```{r}
-boxplot(mean_word_syllables, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
-```
-
-```{r}
-boxplot(log_mean_word_syllables, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+boxplot(mean_word_syllables, main = "Boxplot of Mean word syllables", ylab = "Mean word syllables", cex.main = 1, 
+        cex.lab = 1, col = "yellow")
 ```
 
 ```{r}
-boxplot(mean_word_syllables ~ gender, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+boxplot(log_mean_word_syllables, main = "Boxplot of Log mean word syllables", ylab = "Log mean word syllables", cex.main = 1, 
+        cex.lab = 1, col = "yellow")
 ```
+
+```{r}
+boxplot(mean_word_syllables ~ gender, main = "Boxplot of Mean word syllables by Gender", ylab = "Mean word syllables", xlab = "Gender", cex.main = 1,
+        cex.lab = 1, col = "yellow")
+```
+
+## Tests
+
+### Correlation between log of number of listeners and rank (correlation, bootstrapped correlation)
+```{r}
+# Calculate and report the correlation along with the results of a parametric test of the significance of the correlation
+cor1 <- cor(log_listeners, rank)
+cor1test <- cor.test(log_listeners, rank)
+
+# Calculate a 95% bootstrap confidence interval for the true correlation
+N <- 10000
+cors <- rep(NA, N)
+for (i in 1:N)
+{
+  # log_listeners and rank have the same length, so we can use either
+  s <- sample(1:length(log_listeners), length(log_listeners), replace = TRUE)
+  
+  cors[i] = cor(log_listeners[s], rank[s])
+}
+corsCI <- quantile(cors, c(0.025, 0.975))
+print("95% confidence interval for the true correlation")
+corsCI
+
+# Display the results on a histogram (bootstrapped sample correlations, bootstrap confidence interval, and theoretical confidence interval)
+hist(cors, main = "Bootstrap Correlations between Log of number of listeners and Rank", col = "blue")
+abline(v = corsCI, lwd = 3, col = "red")
+abline(v = cor1test$conf.int, lwd = 3, col = "green", lt = 2)
+legend("topright", c("Theoretical CI", "Bootstrap CI"), lwd = 3, col = c("green", "red"), lty = c(2, 1))
+```
+
+
+### Difference in FORCAST readibility between male and female artists (t-test)
+```{r}
+# Check the normality of FORCAST data
+qqPlot(forcast)
+
+# Omit "Group" as a type to compare female and male artists
+test1 <- t.test(forcast[gender != "group"] ~ gender[gender != "group"])
+test1
+```
+
+### Difference in log of number of listeners between female and male artists (permutation test)
+```{r}
+# Transformed version of gender containing only solo artists (omitting the type "group")
+soloGen <- gender[gender != "group"]
+
+# The actual difference between the median log of number of listeners for females and males
+actualDiff <- median(log_listeners[soloGen == "female"]) - median(log_listeners[soloGen == "male"])
+
+# The null hypothesis is that there is no difference in the log of number of listeners between female and male
+# Assuming the null hypothesis is true, calculate the median for permutations of gender
+diffValues <- rep(NA, N)
+for (i in 1:N)
+{
+  fakeGender <- sample(soloGen)
+  diffValues[i] <- median(log_listeners[fakeGender == "female"]) - median(log_listeners[fakeGender == "male"])
+}
+
+# A histogram of the differences in permuted sample medians between males and females, with the actual median difference shown
+hist(diffValues, xlab = "Log of number of listeners", main = "Difference in median log of number of listeners between females and males", col = "red", 
+     breaks = 20, cex.main = 0.7)
+abline(v = actualDiff, col = "blue", lwd = 3)
+text(actualDiff + 0.015, 1000, paste("Actual difference: ", round(actualDiff, 3)), srt = 90, cex = 0.9)
+
+# Calculate and report the p-value
+mean(abs(diffValues) >= abs(actualDiff))
+```
+
+
+### Predicting log of number of listeners based on Year, Type, and their interaction (ANCOVA)
+```{r}
+anc1 <- lm(log_listeners ~ year + type + year*type)
+Anova(anc1, type = 3)
+summary(anc1)
+myResPlots2(anc1)
+```
+*Note: Seems like a lot of outliers and non-normal errors, but significant number of observations, so perhaps model assumptions are still close to being met? (also, no significant heteroskedasticity)*
+
+### GLM and Backwards Stepwise Regression
+```{r}
+# Perform best-subsets regression (we use a significance level of 0.001, as some terms seem to have significantly lower initial p-values)
+mod1 <- lm(log_listeners ~ gender + year + rank + forcast + mean_word_syllables + forcast*mean_word_syllables)
+Anova(mod1, type = 3)
+
+# Final model after removing all non-significant terms
+mod2 <- lm(log_listeners ~ gender + year + rank)
+summary(mod2)
+myResPlots2(mod2)
+```
+*Note: Same observation as the one for the ANCOVA model.*
+
+
+
+
+
+
