@@ -164,15 +164,15 @@ cleaned_df$mean_word_syllables <- textstat_readability(
 )$meanWordSyllables
 ```
 
-### Evaluate Readability
+### Check Lyrics
 ```{r, eval=FALSE}
 suspects <- (cleaned_df %>% 
-               filter(forcast > 12) %>% 
-               arrange(forcast) %>%
-               select(artist, track, cleaned_lyrics, forcast))
+               filter(mean_word_syllables > 2) %>% 
+               arrange(mean_word_syllables) %>%
+               select(artist, track, cleaned_lyrics, mean_word_syllables))
 suspects
 for (row in 1:nrow(suspects)) {
-  print(paste(suspects[row, "track"], " - ", suspects[row, "artist"], suspects[row, "forcast"]))
+  print(paste(suspects[row, "track"], " - ", suspects[row, "artist"], suspects[row, "mean_word_syllables"]))
   print(suspects[row, "cleaned_lyrics"])
 }
 ```
@@ -209,8 +209,9 @@ plot(log_listeners ~ rank, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 
 plot(last_fm_listeners ~ year, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
 ```
 
+
 ```{r}
-plot(log_listeners ~ year, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
+plot(mean_word_syllables ~ year, main="", xlab="", ylab = "", cex.main = 1, cex.lab = 1)
 ```
 
 ## BoxPlot
