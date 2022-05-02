@@ -24,6 +24,8 @@ library(quanteda)
 library(quanteda.textstats)
 library(car)
 library(leaps)
+library(corrplot)
+library(PerformanceAnalytics)
 source("http://www.reuningscherer.net/s&ds230/Rfuncs/regJDRS.txt")
 ```
 
@@ -44,7 +46,7 @@ dfArtists[dfArtists == "nan"] <- NA
 # type (Person, Group, Orchestra, more (?))
 # area.name <- looks like there are some states here, but mostly countries!
 dfArtistsInterest <- dfArtists %>%
-   dplyr::select(artist_id, type, gender) %>%
+   dplyr::select(artist_id, type, area.name, gender) %>%
    # the objects need to be class "data frame" 
    as.data.frame()
 ```
@@ -59,6 +61,7 @@ cleaned_df <-dfSongsArtists %>%
   filter(!is.na(lyrics))  %>%
   filter(!is.na(artist))  %>%
   # filter(!is.na(gender))  %>%
+  filter(!is.na(area.name)) %>%
   filter(!is.na(type))  %>%
   filter(!is.na(last_fm_listeners))  %>%
   as.data.frame()
@@ -87,6 +90,20 @@ cleaned_df %>% count(gender)
 cleaned_df <- cleaned_df %>% filter(gender != "non-binary")
 dim(cleaned_df)
 ```
+### area.name -> country
+```{r}
+unique(cleaned_df$area.name)
+cleaned_df <- cleaned_df %>% 
+    mutate(country = dplyr::recode(area.name, "Los Angeles" = "United States", "Boston" = "United States", "Malvern" = "United States", "Olympia Fields" = "United States", "Alpharetta" = "United States", "Atlanta" = "United States", "Nordrhein-Westfalen" = "Germany", "Saddle River" = "United States", "Florida" = "United States", "Hollywood" = "United States", "Manhattan" = "United States", "Vancouver" = "Canada", "Portland" = "United States", "Quebec" = "Canada", "New York" = "United States", "Hawaii" = "United States", "Devon" = "United States", "Toronto" = "Canada", "[Worldwide]" = "Worldwide", "London" = "United Kingdom", "British Virgin Islands" = "United Kingdom", "Brooklyn" = "United States", "Ann Arbor" = "United States", "Salt Lake City" = "United States", "Rome" = "Italy", "Nashville" = "United States", "Chicago" = "United States", "Houston" = "United States", "Scotland" = "United Kingdom", "England" = "United Kingdom", "Puerto Rico" = "United States"))
+cleaned_df %>% count(country)
+cleaned_df <- cleaned_df %>% 
+    mutate(region = dplyr::recode(country, "Austria" = "Non-UK Europe", "Belgium" = "Non-UK Europe", "Austria" = "Non-UK Europe", "Denmark" = "Non-UK Europe", "Finland" = "Non-UK Europe", "France" = "Non-UK Europe", "Germany" = "Non-UK Europe", "Greece" = "Non-UK Europe", "Iceland" = "Non-UK Europe", "Ireland" = "Non-UK Europe", "Italy" = "Non-UK Europe", "Moldova" = "Non-UK Europe", "Netherelands" = "Non-UK Europe", "Norway" = "Non-UK Europe", "Romania" = "Non-UK Europe", "Russia" = "Non-UK Europe", "Switzerland" = "Non-UK Europe", "Sweden" = "Non-UK Europe", "Spain" = "Non-UK Europe", "Netherlands" = "Non-UK Europe", "Senegal" = "Africa", "Guinea" = "Africa", "Jamaica" = "Africa", "Morocco" = "Africa", "South Africa" = "Africa", "Bahamas" = "Non-Canada/US Americas", "Barbados" = "Non-Canada/US Americas", "Jamaica" = "Non-Canada/US Americas", "Colombia" = "Non-Canada/US Americas", "Panama" = "Non-Canada/US Americas", "Saint Vincent and The Grenadines" = "Non-Canada/US Americas", "Japan" = "Misc", "South Korea" = "Misc", "Worldwide" = "Misc", "Philippines" = "Misc", "Australia" = "Oceania", "New Zealand" = "Oceania"))
+cleaned_df %>% count(region)
+cleaned_df <- cleaned_df %>% 
+    mutate(region = dplyr::recode(region, "Africa" = "Misc", "Non-Canada/US Americas" = "Misc", "Oceania" = "Misc"))
+cleaned_df %>% count(region)
+```
+
 
 ## Type
 ```{r}
@@ -170,7 +187,7 @@ for (row in 1:nrow(suspects)) {
 
 ```{r}
 subset_df <- cleaned_df %>%
-   dplyr::select(year, type, gender, last_fm_listeners, artist_appearances, rank, forcast, mean_word_syllables)
+   dplyr::select(year, type, region, gender, last_fm_listeners, artist_appearances, rank, forcast, mean_word_syllables)
 subset_df$log_listeners <- log(subset_df$last_fm_listeners)
 subset_df$log_artist_appearances <- log(subset_df$artist_appearances)
 subset_df$log_mean_word_syllables <- log(subset_df$mean_word_syllables)
@@ -300,14 +317,31 @@ myResPlots2(anc1)
 ```
 *Note: Seems like a lot of outliers and non-normal errors, but significant number of observations, so perhaps model assumptions are still close to being met? (also, no significant heteroskedasticity)*
 
+### Mixed Correlation Plots
+```{r}
+# Calculate the pairwise correlations
+cor1 <- cor(subset_df[ , c("log_listeners", "year", "artist_appearances", "rank", "forcast", "mean_word_syllables")])
+
+# Calculate the pairwise correlation significances
+sigcorr <- cor.mtest(subset_df[ , c("log_listeners", "year", "rank", "artist_appearances", "forcast", "mean_word_syllables")], conf.level = .95)
+
+#Use corrplot.mixed to display confidence ellipses, pairwise correlation values, and put on 'X' over non-significant values.
+corrplot.mixed(cor1, lower.col="black", upper = "ellipse", tl.col = "black", number.cex=.7, 
+                tl.pos = "lt", tl.cex=.7, p.mat = sigcorr$p, sig.level = .05)
+
+chart.Correlation(subset_df[ , c("log_listeners", "year", "rank", "artist_appearances", "forcast", "mean_word_syllables")], histogram = TRUE, pch = 19)
+```
+
+
 ### GLM and Backwards Stepwise Regression
 ```{r}
 # Perform best-subsets regression (we use a significance level of 0.001, as some terms seem to have significantly lower initial p-values)
-mod1 <- lm(log_listeners ~ gender + year + rank + forcast + mean_word_syllables + forcast*mean_word_syllables)
+# We omit mean_word_syllables due to the strong positive correlation between it and forcast (to prevent issues caused by collinearity)
+mod1 <- lm(log_listeners ~ gender + year + rank + region + artist_appearances + forcast)
 Anova(mod1, type = 3)
 
-# Final model after removing all non-significant terms
-mod2 <- lm(log_listeners ~ gender + year + rank)
+# Final model after removing non-significant terms
+mod2 <- lm(log_listeners ~ gender + year + rank + region + artist_appearances)
 summary(mod2)
 myResPlots2(mod2)
 ```
