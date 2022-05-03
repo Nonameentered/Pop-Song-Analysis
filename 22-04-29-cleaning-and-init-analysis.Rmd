@@ -273,12 +273,20 @@ legend("topright", c("Theoretical CI", "Bootstrap CI"), lwd = 3, col = c("green"
 ### Difference in FORCAST readibility between male and female artists (t-test)
 ```{r}
 # Check the normality of FORCAST data
-qqPlot(forcast)
+qqPlot(forcast, main = "Normal Quantile Plot of FORCAST readibility scores", ylab = "FORCAST readibility score", xlab = "Normal Quantiles")
+
+# The normal quantile plot is not exactly linear, so we perform a Box Cox transformation
+trans1 <- boxCox(aov(forcast[gender != "group"] ~ gender[gender != "group"]))
+pow1 <- trans1$x[which.max(trans1$y)]
+
+# Apply the transformation to FORCAST
+trans_forcast <- forcast^-1
 
 # Omit "Group" as a type to compare female and male artists
-test1 <- t.test(forcast[gender != "group"] ~ gender[gender != "group"])
+test1 <- t.test(trans_forcast[gender != "group"] ~ gender[gender != "group"])
 test1
 ```
+*Note: keep the transformation in mind when interpreting (female artists have less complex songs)*
 
 ### Difference in log of number of listeners between female and male artists (permutation test)
 ```{r}
@@ -298,7 +306,7 @@ for (i in 1:N)
 }
 
 # A histogram of the differences in permuted sample medians between males and females, with the actual median difference shown
-hist(diffValues, xlab = "Log of number of listeners", main = "Difference in median log of number of listeners between females and males", col = "red", 
+hist(diffValues, xlab = "Log of number of listeners", main = "Difference in median log of number of listeners between females and males", col = "red",
      breaks = 20, cex.main = 0.7)
 abline(v = actualDiff, col = "blue", lwd = 3)
 text(actualDiff + 0.015, 1000, paste("Actual difference: ", round(actualDiff, 3)), srt = 90, cex = 0.9)
@@ -333,19 +341,26 @@ chart.Correlation(subset_df[ , c("log_listeners", "year", "rank", "artist_appear
 ```
 
 
-### GLM and Backwards Stepwise Regression
+### Box Cox transformation, GLM, and Backwards Stepwise Regression
 ```{r}
-# Perform best-subsets regression (we use a significance level of 0.001, as some terms seem to have significantly lower initial p-values)
+# Perform a Box Cox transformation
+trans2 <- boxCox(lm(last_fm_listeners ~ gender + year + rank + region + artist_appearances + gender*year + year*rank + region*gender, data = subset_df))
+pow2 <- trans2$x[which.max(trans2$y)]
+
+# Apply the transformation to the variable
+trans_listeners <- last_fm_listeners^pow1
+
+# Perform backwards stepwise regression (we use a significance of 0.001 due to some initial p-values being extremely small)
 # We omit mean_word_syllables due to the strong positive correlation between it and forcast (to prevent issues caused by collinearity)
-mod1 <- lm(log_listeners ~ gender + year + rank + region + artist_appearances + forcast)
+mod1 <- lm(trans_listeners ~ gender + year + rank + region + artist_appearances + gender*year + year*rank + region*gender)
 Anova(mod1, type = 3)
 
 # Final model after removing non-significant terms
-mod2 <- lm(log_listeners ~ gender + year + rank + region + artist_appearances)
+mod2 <- lm(trans_listeners ~ gender + year + rank + region + artist_appearances + gender*year)
 summary(mod2)
 myResPlots2(mod2)
 ```
-*Note: Same observation as the one for the ANCOVA model.*
+*Last two terms interesting; male and groups getting less popular with time?*
 
 
 
