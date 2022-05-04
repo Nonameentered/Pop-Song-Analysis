@@ -240,6 +240,19 @@ boxplot(mean_word_syllables ~ gender, main = "Boxplot of Mean word syllables by 
         cex.lab = 1, col = "yellow")
 ```
 
+## Normal quantile plots
+```{r}
+qqPlot(forcast, xlab = "Normal Quantiles", ylab = "FORCAST readibility scores", main = "Normal Quantile Plot of FORCAST Readibility Scores")
+```
+```{r}
+qqPlot(log_listeners, xlab = "Normal Quantiles", ylab = "Log of Last.fm listeners", 
+       main = "Normal Quantile Plot of Log of Last.fm listeners")
+```
+```{r}
+qqPlot(last_fm_listeners, xlab = "Normal Quantiles", ylab = "Number of Last.fm listeners", 
+       main = "Normal Quantile Plot of Number of Last.fm listeners")
+```
+
 ## Tests
 
 ### Correlation between log of number of listeners and rank (correlation, bootstrapped correlation)
@@ -272,18 +285,8 @@ legend("topright", c("Theoretical CI", "Bootstrap CI"), lwd = 3, col = c("green"
 
 ### Difference in FORCAST readibility between male and female artists (t-test)
 ```{r}
-# Check the normality of FORCAST data
-qqPlot(forcast, main = "Normal Quantile Plot of FORCAST readibility scores", ylab = "FORCAST readibility score", xlab = "Normal Quantiles")
-
-# The normal quantile plot is not exactly linear, so we perform a Box Cox transformation
-trans1 <- boxCox(aov(forcast[gender != "group"] ~ gender[gender != "group"]))
-pow1 <- trans1$x[which.max(trans1$y)]
-
-# Apply the transformation to FORCAST
-trans_forcast <- forcast^-1
-
 # Omit "Group" as a type to compare female and male artists
-test1 <- t.test(trans_forcast[gender != "group"] ~ gender[gender != "group"])
+test1 <- t.test(forcast[gender != "group"] ~ gender[gender != "group"])
 test1
 ```
 *Note: keep the transformation in mind when interpreting (female artists have less complex songs)*
@@ -344,8 +347,8 @@ chart.Correlation(subset_df[ , c("log_listeners", "year", "rank", "artist_appear
 ### Box Cox transformation, GLM, and Backwards Stepwise Regression
 ```{r}
 # Perform a Box Cox transformation
-trans2 <- boxCox(lm(last_fm_listeners ~ gender + year + rank + region + artist_appearances + gender*year + year*rank + region*gender, data = subset_df))
-pow2 <- trans2$x[which.max(trans2$y)]
+trans1 <- boxCox(lm(last_fm_listeners ~ gender + year + rank + region + artist_appearances + gender*year + year*rank + region*gender, data = subset_df))
+pow1 <- trans1$x[which.max(trans1$y)]
 
 # Apply the transformation to the variable
 trans_listeners <- last_fm_listeners^pow1
