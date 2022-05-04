@@ -242,9 +242,6 @@ boxplot(mean_word_syllables ~ gender, main = "Boxplot of Mean word syllables by 
 
 ## Normal quantile plots
 ```{r}
-qqPlot(forcast, xlab = "Normal Quantiles", ylab = "FORCAST readibility scores", main = "Normal Quantile Plot of FORCAST Readibility Scores")
-```
-```{r}
 qqPlot(log_listeners, xlab = "Normal Quantiles", ylab = "Log of Last.fm listeners", 
        main = "Normal Quantile Plot of Log of Last.fm listeners")
 ```
