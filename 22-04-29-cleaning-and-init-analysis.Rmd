@@ -188,105 +188,78 @@ cleaned_df$mean_word_syllables <- textstat_readability(
 )$meanWordSyllables
 ```
 
-### Check Lyrics
-```{r, eval=FALSE}
-suspects <- (cleaned_df %>% 
-               filter(mean_word_syllables > 2) %>% 
-               arrange(mean_word_syllables) %>%
-               select(artist, track, cleaned_lyrics, mean_word_syllables))
-suspects
-for (row in 1:nrow(suspects)) {
-  print(paste(suspects[row, "track"], " - ", suspects[row, "artist"], suspects[row, "mean_word_syllables"]))
-  print(suspects[row, "cleaned_lyrics"])
-}
-```
+*Then, using the function textstat_readability, we calculated the FORCAST readability of the lyrics, which is basically the proportion of one syllable words to the total number of words. We chose the FORCAST metric over other metrics because it is one of the only metrics that don’t look for sentences. Since most lyrics do not contain fully formed grammatical sentences with periods, the FORCAST metric is suitable for our data. We additionally add a second readability metric, which is simply the mean number of syllables for a word in a song.*
 
-## Filter to Relevant Details
+### Filter to Relevant Details
 
 ```{r}
 subset_df <- cleaned_df %>%
    dplyr::select(year, type, region, gender, last_fm_listeners, artist_appearances, rank, forcast, mean_word_syllables)
 subset_df$log_listeners <- log(subset_df$last_fm_listeners)
-subset_df$log_artist_appearances <- log(subset_df$artist_appearances)
-subset_df$log_mean_word_syllables <- log(subset_df$mean_word_syllables)
 attach(subset_df)
 ```
 
-# Graphics
-## Histograms
+## Descriptive Plots
+### Histograms
 ```{r}
 hist(last_fm_listeners, main="Histogram of Last.fm listeners", xlab="Last.fm listeners", ylab = "Frequency", cex.main = 1, cex.lab = 1, col = "blue")
 ```
+
+*The histogram of last.fm listeners is heavily right-skewed.*
+
 ```{r}
 hist(log_listeners, main="Histogram of Log Last.fm listeners", xlab="Last.fm listeners", ylab = "Frequency", cex.main = 1, cex.lab = 1, col = "blue")
 ```
-## Scatterplots
+
+*Thus, we applied a log transformation on last.fm listeners to see if it might solve the skew problem. However, the log of last.fm listeners turns out to be left-skewed. This suggests we might need to do a different transformation on last.fm listeners.*
+
+### Scatterplots
 ```{r}
 plot(last_fm_listeners ~ rank, main = "Last.fm listeners versus Rank", xlab = "Rank", ylab = "Last.fm listeners", cex.main = 1, 
      cex.lab = 1, col = "red")
 ```
 
-```{r}
-plot(log_listeners ~ rank, main="Log Last.fm listeners versus Rank", xlab = "Rank", ylab = "Log Last.fm listeners", cex.main = 1,
-     cex.lab = 1, col = "red")
-```
+*In this scatterplot, it appears that most of the data seems to be concentrated around the less than 500,000 number of listeners mark. There also does not appear to be any indication of a clearly defined relationship between last.fm listeners and rank. However, when looked at carefully, there seems to be a slight downward trend as the rank increases in numeric value (i.e. as the song places lower on the chart). It is also quite interesting that there are data points beyond the 1 million mark for ranks numerically above 50, which is surprising considering how we might assume that songs lower on the chart ranks would have fewer cumulative listeners. This might hint to what we could refer to as the “staying power” of a song, which refers to the popularity of the song across its existence on last.fm.*
 
-```{r}
-plot(last_fm_listeners ~ year, main = "Last.fm listeners versus Year", xlab = "Year", ylab = "Last.fm listeners", cex.main = 1, 
-     cex.lab = 1, col = "red")
-```
-
-
-```{r}
-plot(mean_word_syllables ~ year, main = "Mean word syllables versus Year", xlab = "Year", ylab = "Mean word syllables", cex.main = 1,
-     cex.lab = 1, col = "red")
-```
-
-## Boxplots
-```{r}
-boxplot(mean_word_syllables, main = "Boxplot of Mean word syllables", ylab = "Mean word syllables", cex.main = 1, 
-        cex.lab = 1, col = "yellow")
-```
-
-```{r}
-boxplot(log_mean_word_syllables, main = "Boxplot of Log mean word syllables", ylab = "Log mean word syllables", cex.main = 1, 
-        cex.lab = 1, col = "yellow")
-```
-
+### Boxplots
 ```{r}
 boxplot(mean_word_syllables ~ gender, main = "Boxplot of Mean word syllables by Gender", ylab = "Mean word syllables", xlab = "Gender", cex.main = 1,
         cex.lab = 1, col = "yellow")
 ```
 
-## Tests
+*The boxplots of mean word syllables by gender show that the mean word syllables across genders have similar medians and interquartile ranges. The genders Group (Band) and Male, however, seem to have a lot more outliers than Female.*
 
-### Correlation between log of number of listeners and rank (correlation, bootstrapped correlation)
+## Analysis/Tests
+
+### Correlation between number of listeners and rank (correlation, bootstrapped correlation)
+
 ```{r}
 # Calculate and report the correlation along with the results of a parametric test of the significance of the correlation
-cor1 <- cor(log_listeners, rank)
-cor1test <- cor.test(log_listeners, rank)
+(cor1 <- cor(last_fm_listeners, rank))
+cor1test <- cor.test(last_fm_listeners, rank)
 
 # Calculate a 95% bootstrap confidence interval for the true correlation
 N <- 10000
 cors <- rep(NA, N)
 for (i in 1:N)
 {
-  # log_listeners and rank have the same length, so we can use either
-  s <- sample(1:length(log_listeners), length(log_listeners), replace = TRUE)
+  # listeners and rank have the same length, so we can use either
+  s <- sample(1:length(last_fm_listeners), length(last_fm_listeners), replace = TRUE)
   
-  cors[i] = cor(log_listeners[s], rank[s])
+  cors[i] = cor(last_fm_listeners[s], rank[s])
 }
 corsCI <- quantile(cors, c(0.025, 0.975))
 print("95% confidence interval for the true correlation")
 corsCI
 
 # Display the results on a histogram (bootstrapped sample correlations, bootstrap confidence interval, and theoretical confidence interval)
-hist(cors, main = "Bootstrap Correlations between Log of number of listeners and Rank", col = "blue")
+hist(cors, main = "Bootstrap Correlations between Number of listeners and Rank", col = "blue")
 abline(v = corsCI, lwd = 3, col = "red")
 abline(v = cor1test$conf.int, lwd = 3, col = "green", lt = 2)
 legend("topright", c("Theoretical CI", "Bootstrap CI"), lwd = 3, col = c("green", "red"), lty = c(2, 1))
 ```
 
+*There is a weak negative correlation between the raw number of listeners and rank. We also calculated the bootstrapped correlation between these two variables. The bootstrapped confidence intervals and theoretical confidence intervals appear to be the same, though the theoretical CI is slightly narrower.*
 
 ### Difference in FORCAST readibility between male and female artists (t-test)
 ```{r}
@@ -304,7 +277,8 @@ trans_forcast <- forcast^-1
 test1 <- t.test(trans_forcast[gender != "group"] ~ gender[gender != "group"])
 test1
 ```
-*Note: keep the transformation in mind when interpreting (female artists have less complex songs)*
+
+*We then wanted to see if there was a significant difference in FORCAST readability between male and female artist produced songs. First, we checked to see if FORCAST is normally distributed. The normal quantile plot is not linear, suggesting that FORCAST is not normally distributed. Thus, we performed a box-cox transformation and got a lambda of around -1. Thus, we transformed the FORCAST variable by raising it to -1 power. The p-value from the Welch’s t-test is 0.011, which is less than 0.05. Thus, we can reject the null hypothesis and conclude that there is a significant difference in the transformed FORCAST readability between male and female artists.*
 
 ### Difference in log of number of listeners between female and male artists (permutation test)
 ```{r}
