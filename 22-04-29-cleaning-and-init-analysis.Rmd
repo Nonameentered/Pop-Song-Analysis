@@ -1,20 +1,36 @@
 ---
 title: "S&DS 230 Project"
-author: "Matt Shu"
+author: "Matt Shu, Cem Kupeli, Shen-Vey Lai, Se Ri Lee"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+## Introduction
+
+*Music is a big part of our lives! We stream music all the time, and we occasionally peek at charts to see if our favorite artist made the list. We may also wonder how certain variables, like rank, total number of listeners, and length of lyrics, may be related to each other. For our report, we specifically looked at Last.fm. We wanted to see if the total number of listeners for each song can be predicted by variables such as rank, length of lyrics, year, and the number of artist appearances.*
+
+## Data
+
+* Response Variable
+    + Number of listeners on Last.fm (i.e. the cumulative number of listeners for each track since the inception of Last.fm or the release of the track)
+* Categorical Variables
+    + Gender 
+    + Region (i.e. the country where the song was produced)
+    + Type (band or soloist)
+* Continuous Variables 
+    + Year (i.e. the year in which the chart rankings are taken from)
+    + Rank (i.e. a value between 1-100 representing its place the first time it appears on a year-end chart)
+    + forcast (i.e. a measure of a lyric’s readability measured by the proportion of one syllable words in a song)
+    + mean_word_syllables (i.e. the average number of syllables per word in the lyrics) 
 
 ## Prereqs
 
-```{r, message=FALSE, results = 'hide'}
-# Hotfix to overcome error found below with Homebrew TBB vs bundled TBB (only needed once): 
-# https://github.com/RcppCore/RcppParallel/issues/182
-# remotes::install_github("RcppCore/RcppParallel") 
+```{r, message=FALSE, results = 'hide', warning=FALSE}
 library(tidyverse)
 library(RSQLite)
 library(RecordLinkage)
@@ -32,80 +48,76 @@ source("http://www.reuningscherer.net/s&ds230/Rfuncs/regJDRS.txt")
 ```{r}
 conn <- dbConnect(RSQLite::SQLite(), "22-04-29-playback-fm-top-pop.db")
 dfSongs <- dbGetQuery(conn, 'SELECT * FROM tracks')
+dim(dfSongs)
 dfArtists <- dbGetQuery(conn, 'SELECT * FROM artists')
 dbDisconnect(conn)
 ```
 
+*We used RSQLite to separate the raw data into two dataframes: dfSongs and dfArtists. dfSongs contains information about the songs, and dfArtists stores information about the artists.*
 
 ## Data Cleaning
 ### Artist Dataset
 #### Cleaning + Subset of Interest
 ```{r}
 dfArtists[dfArtists == "nan"] <- NA
-
-# type (Person, Group, Orchestra, more (?))
-# area.name <- looks like there are some states here, but mostly countries!
 dfArtistsInterest <- dfArtists %>%
    dplyr::select(artist_id, type, area.name, gender) %>%
-   # the objects need to be class "data frame" 
    as.data.frame()
 ```
+
+*Then, we created a new dataframe dfArtistsInterest, which is a subset of the dataframe dfArtists. dfArtistsInterest contains four columns: the id of the artist, the type (whether the artist is a band or soloist), the area/region the song was produced/released, and the gender of the artist. *
+
 #### Merge Artists with Songs
 ```{r}
 dfSongsArtists <- merge(dfSongs,dfArtistsInterest,by="artist_id")
+dim(dfSongsArtists)
 ```
+
+*We then merged the dfSongs dataframe with the dfArtistsInterest dataframe.*
 
 ### Filter out NA's in Important Parameters
 ```{r Remove Missing}
 cleaned_df <-dfSongsArtists %>%
   filter(!is.na(lyrics))  %>%
   filter(!is.na(artist))  %>%
-  # filter(!is.na(gender))  %>%
   filter(!is.na(area.name)) %>%
   filter(!is.na(type))  %>%
   filter(!is.na(last_fm_listeners))  %>%
   as.data.frame()
-```
-
-```{r}
-print("Pre-Cleaning # Songs")
-dim(dfSongs)
-print("Post Merge # Songs")
-dim(dfSongsArtists)
-print("Post-Cleaning Songs Remaining")
 dim(cleaned_df)
 ```
 
+*In cleaned_df, we kept only the rows in which lyrics, artist, area.name, type, and last_fm_listeners are not NA.*
+
 ### Gender
-```{r}
-# 944 artist id
+```{r, results='hide'}
 unique(cleaned_df$gender)
 cleaned_df <- cleaned_df %>% 
     mutate(gender = replace(gender, gender == "other", "non-binary"))
-# Alternative, use recode
 cleaned_df <- cleaned_df %>% 
     mutate(gender = replace(gender, is.na(gender), "group"))
 cleaned_df %>% count(gender)
-# Since the number of non-binary singers is small, we unfortunately remove them as we are unlikely to find strong conclusions about them
 cleaned_df <- cleaned_df %>% filter(gender != "non-binary")
 dim(cleaned_df)
 ```
+
+*In this section, we cleaned the variable Gender. Before cleaning, the possible values for Gender are NA, male, female, other, and non-binary. We changed all “other” values to “non-binary.” Then, for the NAs, we changed their value to “group” since a gender of NA probably means the artist is a band, not a soloist. We found that most artists were bands (groups). Out of the soloists, male artists were the most prevalent. Since the number of non-binary singers is small, we unfortunately removed them from our dataset.*
+
 ### area.name -> country
 ```{r}
-unique(cleaned_df$area.name)
 cleaned_df <- cleaned_df %>% 
     mutate(country = dplyr::recode(area.name, "Los Angeles" = "United States", "Boston" = "United States", "Malvern" = "United States", "Olympia Fields" = "United States", "Alpharetta" = "United States", "Atlanta" = "United States", "Nordrhein-Westfalen" = "Germany", "Saddle River" = "United States", "Florida" = "United States", "Hollywood" = "United States", "Manhattan" = "United States", "Vancouver" = "Canada", "Portland" = "United States", "Quebec" = "Canada", "New York" = "United States", "Hawaii" = "United States", "Devon" = "United States", "Toronto" = "Canada", "[Worldwide]" = "Worldwide", "London" = "United Kingdom", "British Virgin Islands" = "United Kingdom", "Brooklyn" = "United States", "Ann Arbor" = "United States", "Salt Lake City" = "United States", "Rome" = "Italy", "Nashville" = "United States", "Chicago" = "United States", "Houston" = "United States", "Scotland" = "United Kingdom", "England" = "United Kingdom", "Puerto Rico" = "United States"))
-cleaned_df %>% count(country)
 cleaned_df <- cleaned_df %>% 
     mutate(region = dplyr::recode(country, "Austria" = "Non-UK Europe", "Belgium" = "Non-UK Europe", "Austria" = "Non-UK Europe", "Denmark" = "Non-UK Europe", "Finland" = "Non-UK Europe", "France" = "Non-UK Europe", "Germany" = "Non-UK Europe", "Greece" = "Non-UK Europe", "Iceland" = "Non-UK Europe", "Ireland" = "Non-UK Europe", "Italy" = "Non-UK Europe", "Moldova" = "Non-UK Europe", "Netherelands" = "Non-UK Europe", "Norway" = "Non-UK Europe", "Romania" = "Non-UK Europe", "Russia" = "Non-UK Europe", "Switzerland" = "Non-UK Europe", "Sweden" = "Non-UK Europe", "Spain" = "Non-UK Europe", "Netherlands" = "Non-UK Europe", "Senegal" = "Africa", "Guinea" = "Africa", "Jamaica" = "Africa", "Morocco" = "Africa", "South Africa" = "Africa", "Bahamas" = "Non-Canada/US Americas", "Barbados" = "Non-Canada/US Americas", "Jamaica" = "Non-Canada/US Americas", "Colombia" = "Non-Canada/US Americas", "Panama" = "Non-Canada/US Americas", "Saint Vincent and The Grenadines" = "Non-Canada/US Americas", "Japan" = "Misc", "South Korea" = "Misc", "Worldwide" = "Misc", "Philippines" = "Misc", "Australia" = "Oceania", "New Zealand" = "Oceania"))
-cleaned_df %>% count(region)
+# cleaned_df %>% count(region)
 cleaned_df <- cleaned_df %>% 
     mutate(region = dplyr::recode(region, "Africa" = "Misc", "Non-Canada/US Americas" = "Misc", "Oceania" = "Misc"))
 cleaned_df %>% count(region)
 ```
 
+*Next, we condensed the variable Region so as to limit the number of different categories. We started by replacing the names of cities and states in the variable to their respective countries (e.g: Boston → United States). We then went on to categorize countries with less frequent appearances in the data into their larger affiliated regions (e.g: Austria → Non-UK Europe) and others without clear regional affiliations into Misc. Eventually, we decided to combine the regions Africa, Non-Canada/US Americas and Oceania and place them under Misc as well. By the end of this, we ended up with 5 main regions: Canada, United States, United Kingdom, Non-UK Europe and Misc.*
 
-## Type
+### Type
 ```{r}
 unique(cleaned_df$type)
 cleaned_df %>% count(type)
@@ -114,7 +126,9 @@ cleaned_df <- cleaned_df %>% filter(type %in% c("Group", "Person"))
 dim(cleaned_df)
 ```
 
-## Filter out Mismatches in Lyrics
+*For this step, we wanted to categorize the types of artists into two distinct types: soloists (Person) and bands (Group). However, while doing this, we encountered a bug in which, despite cleaning the data so that the variable Type would only contain Person or Group, there was one row that had “Other” as its data Type. We took out this "Other," though we were unable to figure out why it was there.*
+
+### Filter out Mismatches in Lyrics
 
 ```{r Remove Erroneous Lyrics}
 # 
@@ -143,7 +157,9 @@ cleaned_df <- cleaned_df %>% filter(nchar(cleaned_lyrics) > 100)
 dim(cleaned_df)
 ```
 
-## Readability
+*Now on to cleaning the lyrics! For this, we started by identifying the “problematic” lyrics in the data, particularly ones that did not contain the actual lyrics. We then replaced these strings with NA characters and proceeded to remove them. Another method we used to clean the lyrics was to use the levenshteinSim function. The variable lyrics is formatted such that it should start with the name of the track, followed by the string ‘Lyrics’ and then the actual lyrics of the song. The function allowed us to compare for similarity between the title of the track and the initial part of the “lyrics”. If the two strings were not at least 50% similar, we removed them.*
+
+### Readability
 ```{r}
 cleaned_corpus <- corpus(
   cleaned_df,
@@ -153,7 +169,9 @@ cleaned_corpus <- corpus(
 )
 ```
 
-```{r}
+*Then, we quantified the variable lyrics so that we could use it for our data analysis. One such method is to use the function textstat_readability, which could only read in the corpus data type. Thus, we used the corpus function to convert our cleaned_df dataframe into a corpus data type.*
+
+```{r, results = F}
 # We use FORCAST because it's one of the only readability metrics that don't look for sentences
 cleaned_df$forcast <- textstat_readability(
   cleaned_corpus,
