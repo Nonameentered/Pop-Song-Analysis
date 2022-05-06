@@ -320,27 +320,49 @@ corrplot.mixed(cor1, lower.col="black", upper = "ellipse", tl.col = "black", num
 chart.Correlation(subset_df[ , c("log_listeners", "year", "rank", "artist_appearances", "forcast", "mean_word_syllables")], histogram = TRUE, pch = 19)
 ```
 
+*The only somewhat strong(er) positive correlation that exists is between the log number of listeners and the year. On the other hand, the only somewhat strong(er) negative correlation is between the log number of listeners and the rank. There also appears to be a highly strong correlation between forcast and mean word syllables, which makes sense since the two predictor variables are directly related. This is an example of collinearity.*
 
-### Box Cox transformation, GLM, and Backwards Stepwise Regression
+### Box Cox transformation
 ```{r}
 # Perform a Box Cox transformation
 trans2 <- boxCox(lm(last_fm_listeners ~ gender + year + rank + region + artist_appearances + gender*year + year*rank + region*gender, data = subset_df))
 pow2 <- trans2$x[which.max(trans2$y)]
 
 # Apply the transformation to the variable
-trans_listeners <- last_fm_listeners^pow1
+trans_listeners <- last_fm_listeners^pow2
 
-# Perform backwards stepwise regression (we use a significance of 0.001 due to some initial p-values being extremely small)
-# We omit mean_word_syllables due to the strong positive correlation between it and forcast (to prevent issues caused by collinearity)
+hist(trans_listeners, main="Histogram of Last.fm listeners (transformed)", xlab="Last.fm listeners ^ 0.303", ylab = "Frequency", cex.main = 1, cex.lab = 1, col = "blue")
+```
+
+*Earlier, we found that both the raw data and log transformed data of last.fm listeners produced skewed histograms. Here, we performed a boxcox transformation on last.fm listeners to hopefully obtain a normal distribution. We got a lambda value of 0.303, and so we raised last.fm listeners to the 0.303 power. The histogram now looks a lot more normally distributed.*
+
+### ANCOVA
+```{r}
+anc1 <- lm(trans_listeners ~ year + type + year*type)
+Anova(anc1, type = 3)
+summary(anc1)
+myResPlots2(anc1)
+```
+
+*We then performed ANCOVA to predict the transformed last.fm listener variable with the variables year, type, and the interaction between year and type. Based on their p-values which are all lower than 0.05, we can conclude that year, type, and the interaction between year and type are all significant predictors. The model fit is great. The normal quantile plot of the residuals is linear, suggesting that the residuals are normally distributed. The fits vs residuals plot shows no heteroskedasticity and contain minimal outliers.*
+
+*Lastly, we performed a backwards stepwise regression, a kind of multiple regression, to assess which variables and their interactions are significant predictors of the transformed last.fm listeners. We included the variables gender, year, rank, region, and the number of artist appearances, as well as the interaction between gender and year, year and rank, and region and gender. Due to the strong positive correlation between mean_word_syllables and FORCAST, we omitted mean_word_syllables before performing backwards stepwise regression. We used a significance of 0.001 since most of the p-values are very low to begin with. We started out by looking at the p-values of the interaction terms, eliminating first the interaction term with the highest p-value.*
+
+### GLM and Backwards Stepwise Regression
+```{r}
 mod1 <- lm(trans_listeners ~ gender + year + rank + region + artist_appearances + gender*year + year*rank + region*gender)
 Anova(mod1, type = 3)
 
-# Final model after removing non-significant terms
-mod2 <- lm(trans_listeners ~ gender + year + rank + region + artist_appearances + gender*year)
+mod2 <- lm(trans_listeners ~ gender + year + rank + region + artist_appearances + gender*year + region*gender)
 summary(mod2)
 myResPlots2(mod2)
 ```
-*Last two terms interesting; male and groups getting less popular with time?*
+
+*The interaction between year and rank had a p-value of 0.01, greater than our significance 0.001. Thus, we took this term out of our model. In our new model, the remaining two interaction terms had p-values less than 0.001. Thus, we kept these two terms and exitted out of the backwards regression. Our final model thus contains all variables we started out with except for the interaction between year and rank. The R-squared of our final model is 0.2502. Thus, about 25% of the variability in transformed last.fm listeners can be explained by the predictor variables. The normal quantile plot of the studentized residuals is linear, suggesting that the residuals are normally distributed. The fits vs studentized residuals shows no heteroskedasticity and contain minimal outliers. Thus, our final model fit is great!*
+
+## Conclusion
+
+*Overall, we did not find any strong relationship between any of the variables, other than forcast and mean_word_syllables which are obviously related. However, there was a weak negative correlation between the number of unique listeners on last.fm and the rank of the tracks. That is, the lower the rank of the song (or the higher the numeric value of the ranks), the lower the number of unique listeners, which makes intuitive sense. It is also interesting that the FORCAST readability between male and female artists is significantly different. Although we cannot make any strong statements based on these correlations, our results suggest that there are many other variables at play that we have not considered, many of which are probably not available to the public. Determining which tracks make the chart and which don't is a tricky and complex process that must take into account a multitude of factors.*
 
 
 
