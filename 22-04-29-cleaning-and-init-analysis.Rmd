@@ -226,10 +226,19 @@ plot(last_fm_listeners ~ rank, main = "Last.fm listeners versus Rank", xlab = "R
 boxplot(mean_word_syllables ~ gender, main = "Boxplot of Mean word syllables by Gender", ylab = "Mean word syllables", xlab = "Gender", cex.main = 1,
         cex.lab = 1, col = "yellow")
 ```
-
 *The boxplots of mean word syllables by gender show that the mean word syllables across genders have similar medians and interquartile ranges. The genders Group (Band) and Male, however, seem to have a lot more outliers than Female.*
 
 ## Analysis/Tests
+
+### Normal quantile plots
+```{r}
+qqPlot(log_listeners, xlab = "Normal Quantiles", ylab = "Log of Last.fm listeners", 
+       main = "Normal Quantile Plot of Log of Last.fm listeners")
+```
+```{r}
+qqPlot(last_fm_listeners, xlab = "Normal Quantiles", ylab = "Number of Last.fm listeners", 
+       main = "Normal Quantile Plot of Number of Last.fm listeners")
+```
 
 ### Correlation between number of listeners and rank (correlation, bootstrapped correlation)
 
@@ -274,7 +283,7 @@ pow1 <- trans1$x[which.max(trans1$y)]
 trans_forcast <- forcast^pow1
 
 # Omit "Group" as a type to compare female and male artists
-test1 <- t.test(trans_forcast[gender != "group"] ~ gender[gender != "group"])
+test1 <- t.test(forcast[gender != "group"] ~ gender[gender != "group"])
 test1
 ```
 
@@ -326,7 +335,7 @@ chart.Correlation(subset_df[ , c("log_listeners", "year", "rank", "artist_appear
 ```{r}
 # Perform a Box Cox transformation
 trans2 <- boxCox(lm(last_fm_listeners ~ gender + year + rank + region + artist_appearances + gender*year + year*rank + region*gender, data = subset_df))
-pow2 <- trans2$x[which.max(trans2$y)]
+pow2 <- trans2$x[which.max(trans1$y)]
 
 # Apply the transformation to the variable
 trans_listeners <- last_fm_listeners^pow2
