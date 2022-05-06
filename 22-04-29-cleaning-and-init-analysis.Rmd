@@ -280,7 +280,7 @@ trans1 <- boxCox(aov(forcast[gender != "group"] ~ gender[gender != "group"]))
 pow1 <- trans1$x[which.max(trans1$y)]
 
 # Apply the transformation to FORCAST
-trans_forcast <- forcast^pow1
+trans_forcast <- forcast^-1
 
 # Omit "Group" as a type to compare female and male artists
 test1 <- t.test(forcast[gender != "group"] ~ gender[gender != "group"])
