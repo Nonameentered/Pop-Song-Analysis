@@ -277,7 +277,7 @@ qqPlot(forcast, main = "Normal Quantile Plot of FORCAST readibility scores", yla
 
 # The normal quantile plot is not exactly linear, so we perform a Box Cox transformation
 trans1 <- boxCox(aov(forcast[gender != "group"] ~ gender[gender != "group"]))
-pow1 <- trans1$x[which.max(trans1$y)]
+(pow1 <- trans1$x[which.max(trans1$y)])
 
 # Apply the transformation to FORCAST
 trans_forcast <- forcast^-1
