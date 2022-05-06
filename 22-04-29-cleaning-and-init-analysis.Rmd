@@ -281,15 +281,13 @@ test1
 *We then wanted to see if there was a significant difference in FORCAST readability between male and female artist produced songs. First, we checked to see if FORCAST is normally distributed. The normal quantile plot is not linear, suggesting that FORCAST is not normally distributed. Thus, we performed a box-cox transformation and got a lambda of around -1. Thus, we transformed the FORCAST variable by raising it to -1 power. The p-value from the Welch’s t-test is 0.011, which is less than 0.05. Thus, we can reject the null hypothesis and conclude that there is a significant difference in the transformed FORCAST readability between male and female artists.*
 
 ### Difference in log of number of listeners between female and male artists (permutation test)
+
 ```{r}
 # Transformed version of gender containing only solo artists (omitting the type "group")
 soloGen <- gender[gender != "group"]
 
-# The actual difference between the median log of number of listeners for females and males
 actualDiff <- median(log_listeners[soloGen == "female"]) - median(log_listeners[soloGen == "male"])
 
-# The null hypothesis is that there is no difference in the log of number of listeners between female and male
-# Assuming the null hypothesis is true, calculate the median for permutations of gender
 diffValues <- rep(NA, N)
 for (i in 1:N)
 {
@@ -297,25 +295,15 @@ for (i in 1:N)
   diffValues[i] <- median(log_listeners[fakeGender == "female"]) - median(log_listeners[fakeGender == "male"])
 }
 
-# A histogram of the differences in permuted sample medians between males and females, with the actual median difference shown
 hist(diffValues, xlab = "Log of number of listeners", main = "Difference in median log of number of listeners between females and males", col = "red",
      breaks = 20, cex.main = 0.7)
 abline(v = actualDiff, col = "blue", lwd = 3)
 text(actualDiff + 0.015, 1000, paste("Actual difference: ", round(actualDiff, 3)), srt = 90, cex = 0.9)
 
-# Calculate and report the p-value
 mean(abs(diffValues) >= abs(actualDiff))
 ```
 
-
-### Predicting log of number of listeners based on Year, Type, and their interaction (ANCOVA)
-```{r}
-anc1 <- lm(log_listeners ~ year + type + year*type)
-Anova(anc1, type = 3)
-summary(anc1)
-myResPlots2(anc1)
-```
-*Note: Seems like a lot of outliers and non-normal errors, but significant number of observations, so perhaps model assumptions are still close to being met? (also, no significant heteroskedasticity)*
+*The p-value is greater than any alpha value, so we fail to reject the null hypothesis. Thus, there is no significant difference in the log number of listeners between male and female artists.*
 
 ### Mixed Correlation Plots
 ```{r}
