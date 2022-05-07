@@ -262,7 +262,7 @@ print("95% confidence interval for the true correlation")
 corsCI
 
 # Display the results on a histogram (bootstrapped sample correlations, bootstrap confidence interval, and theoretical confidence interval)
-hist(cors, main = "Bootstrap Correlations between Number of listeners and Rank", col = "blue")
+hist(cors, main = "Bootstrap Correlations between Number of listeners and Rank", col = "blue", cex.main = .6)
 abline(v = corsCI, lwd = 3, col = "red")
 abline(v = cor1test$conf.int, lwd = 3, col = "green", lt = 2)
 legend("topright", c("Theoretical CI", "Bootstrap CI"), lwd = 3, col = c("green", "red"), lty = c(2, 1))
@@ -307,7 +307,7 @@ for (i in 1:N)
 hist(diffValues, xlab = "Number of last.fm listeners", main = "Difference in median number of last.fm listeners between females and males",
      col = "red", breaks = 20, cex.main = 0.7)
 abline(v = actualDiff, col = "blue", lwd = 3)
-text(actualDiff + 4500, 1200, paste("Actual difference: ", round(actualDiff, 3)), srt = 90, cex = 0.9)
+text(actualDiff + 4500, 1200, paste("Actual difference: ", round(actualDiff, 3)), srt = 90, cex = 0.7)
 
 mean(abs(diffValues) >= abs(actualDiff))
 ```
@@ -315,7 +315,7 @@ mean(abs(diffValues) >= abs(actualDiff))
 *The p-value is greater than any alpha value, so we fail to reject the null hypothesis. Thus, there is no significant difference in last.fm listeners between male and female artists.*
 
 ### Mixed Correlation Plots
-```{r}
+```{r, warning=FALSE}
 # Calculate the pairwise correlations
 cor1 <- cor(subset_df[ , c("log_listeners", "year", "artist_appearances", "rank", "forcast", "mean_word_syllables")])
 
@@ -340,7 +340,7 @@ trans2 <- boxCox(lm(last_fm_listeners ~ gender + year + rank + region + artist_a
 # Apply the transformation to the variable
 trans_listeners <- last_fm_listeners^(1/3)
 
-hist(trans_listeners, main="Histogram of Last.fm listeners (transformed)", xlab="Last.fm listeners ^ 1/3", ylab = "Frequency", cex.main = 1, cex.lab = 1, col = "blue")
+hist(trans_listeners, main="Histogram of Last.fm listeners (transformed)", xlab="Last.fm listeners ^ 1/3", ylab = "Frequency", cex.main = 1, cex.lab = 1, col = "blue", cex.main = .6)
 ```
 
 *Earlier, we found that both the raw data and log transformed data of last.fm listeners produced skewed histograms. Here, we performed a Box Cox transformation on last.fm listeners to hopefully obtain a normal distribution. We got a lambda value of 0.303, and so we took the cube root of last.fm listeners. The histogram now looks a lot more normally distributed.*
@@ -361,7 +361,7 @@ data1$trans_listeners <- data1$last_fm_listeners^(1/3)
 # Before performing a Two-way ANOVA, we will examine the interaction plots to see if we expect a significant interaction
 interaction.plot(data1$region, data1$gender, data1$trans_listeners, type = 'b', lwd = 3, 
                  col = c("red", "blue", "black", "orange", "brown", "violet", "dark green"), 
-                 main = "Interaction Plot of Region and Gender")
+                 main = "Interaction Plot of Region and Gender", cex.main = .9)
 
 # Perform the Two-way ANOVA and get results
 test2 <- aov(data1$trans_listeners ~ data1$region + data1$gender + data1$region*data1$gender)
