@@ -1,6 +1,6 @@
 ---
 title: "S&DS 230 Project"
-author: "Matt Shu, Cem Kupeli, Shen-Vey Lai, Se Ri Lee"
+author: ""
 date: "`r Sys.Date()`"
 output:
   word_document: default
