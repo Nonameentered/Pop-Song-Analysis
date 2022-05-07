@@ -283,36 +283,36 @@ trans1 <- boxCox(aov(forcast[gender != "group"] ~ gender[gender != "group"]))
 trans_forcast <- forcast^-1
 
 # Omit "Group" as a type to compare female and male artists
-test1 <- t.test(forcast[gender != "group"] ~ gender[gender != "group"])
+test1 <- t.test(trans_forcast[gender != "group"] ~ gender[gender != "group"])
 test1
 ```
 
-*We then wanted to see if there was a significant difference in FORCAST readability between male and female artist produced songs. First, we checked to see if FORCAST is normally distributed. The normal quantile plot is not linear, suggesting that FORCAST is not normally distributed. Thus, we performed a box-cox transformation and got a lambda of around -1. Thus, we transformed the FORCAST variable by raising it to -1 power. The p-value from the Welch’s t-test is 0.011, which is less than 0.05. Thus, we can reject the null hypothesis and conclude that there is a significant difference in the transformed FORCAST readability between male and female artists.*
+*We then wanted to see if there was a significant difference in FORCAST readability between male and female artist produced songs. First, we checked to see if FORCAST is normally distributed. The normal quantile plot is not linear, suggesting that FORCAST is not normally distributed. Thus, we performed a box-cox transformation and got a lambda of around -1. Thus, we transformed the FORCAST variable by raising it to -1 power. The p-value from the Welch’s t-test is 0.010, which is less than 0.05. Thus, we can reject the null hypothesis and conclude that there is a significant difference in the transformed FORCAST readability between male and female artists.*
 
-### Difference in log of number of listeners between female and male artists (permutation test)
+### Difference in number of listeners between female and male artists (permutation test)
 
 ```{r}
 # Transformed version of gender containing only solo artists (omitting the type "group")
 soloGen <- gender[gender != "group"]
 
-actualDiff <- median(log_listeners[soloGen == "female"]) - median(log_listeners[soloGen == "male"])
+actualDiff <- median(last_fm_listeners[soloGen == "female"]) - median(last_fm_listeners[soloGen == "male"])
 
 diffValues <- rep(NA, N)
 for (i in 1:N)
 {
   fakeGender <- sample(soloGen)
-  diffValues[i] <- median(log_listeners[fakeGender == "female"]) - median(log_listeners[fakeGender == "male"])
+  diffValues[i] <- median(last_fm_listeners[fakeGender == "female"]) - median(last_fm_listeners[fakeGender == "male"])
 }
 
-hist(diffValues, xlab = "Log of number of listeners", main = "Difference in median log of number of listeners between females and males", col = "red",
-     breaks = 20, cex.main = 0.7)
+hist(diffValues, xlab = "Number of last.fm listeners", main = "Difference in median number of last.fm listeners between females and males",
+     col = "red", breaks = 20, cex.main = 0.7)
 abline(v = actualDiff, col = "blue", lwd = 3)
-text(actualDiff + 0.015, 1000, paste("Actual difference: ", round(actualDiff, 3)), srt = 90, cex = 0.9)
+text(actualDiff + 4500, 1200, paste("Actual difference: ", round(actualDiff, 3)), srt = 90, cex = 0.9)
 
 mean(abs(diffValues) >= abs(actualDiff))
 ```
 
-*The p-value is greater than any alpha value, so we fail to reject the null hypothesis. Thus, there is no significant difference in the log number of listeners between male and female artists.*
+*The p-value is greater than any alpha value, so we fail to reject the null hypothesis. Thus, there is no significant difference in last.fm listeners between male and female artists.*
 
 ### Mixed Correlation Plots
 ```{r}
@@ -335,29 +335,50 @@ chart.Correlation(subset_df[ , c("log_listeners", "year", "rank", "artist_appear
 ```{r}
 # Perform a Box Cox transformation
 trans2 <- boxCox(lm(last_fm_listeners ~ gender + year + rank + region + artist_appearances + gender*year + year*rank + region*gender, data = subset_df))
-pow2 <- trans2$x[which.max(trans1$y)]
+(pow2 <- trans2$x[which.max(trans1$y)])
 
 # Apply the transformation to the variable
-trans_listeners <- last_fm_listeners^pow2
+trans_listeners <- last_fm_listeners^(1/3)
 
-hist(trans_listeners, main="Histogram of Last.fm listeners (transformed)", xlab="Last.fm listeners ^ 0.303", ylab = "Frequency", cex.main = 1, cex.lab = 1, col = "blue")
+hist(trans_listeners, main="Histogram of Last.fm listeners (transformed)", xlab="Last.fm listeners ^ 1/3", ylab = "Frequency", cex.main = 1, cex.lab = 1, col = "blue")
 ```
 
-*Earlier, we found that both the raw data and log transformed data of last.fm listeners produced skewed histograms. Here, we performed a boxcox transformation on last.fm listeners to hopefully obtain a normal distribution. We got a lambda value of 0.303, and so we raised last.fm listeners to the 0.303 power. The histogram now looks a lot more normally distributed.*
+*Earlier, we found that both the raw data and log transformed data of last.fm listeners produced skewed histograms. Here, we performed a Box Cox transformation on last.fm listeners to hopefully obtain a normal distribution. We got a lambda value of 0.303, and so we took the cube root of last.fm listeners. The histogram now looks a lot more normally distributed.*
 
-### ANCOVA
+### Two-way ANOVA
 ```{r}
-anc1 <- lm(trans_listeners ~ year + type + year*type)
-Anova(anc1, type = 3)
-summary(anc1)
-myResPlots2(anc1)
+# We will perform a Two-way ANOVA, predicting listeners (transformed) by Region (limited to U.S., U.K., and Non-UK Europe) and Gender (limited to solo artists) as well as their interaction
+# Transformed data set
+data1 <- subset_df %>% filter(region %in% c("United States", "United Kingdom", "Non-UK Europe")) %>% filter(gender != "group")
+
+# Perform a Box Cox transformation
+trans3 <- boxCox(aov(data1$last_fm_listeners ~ data1$region + data1$gender + data1$region*data1$gender))
+(pow3 <- trans3$x[which.max(trans3$y)])
+
+# The suggested lambda value is, once again, close to 1/3, so we use the cube-root transformed version of last.fm listeners once again
+data1$trans_listeners <- data1$last_fm_listeners^(1/3)
+
+# Before performing a Two-way ANOVA, we will examine the interaction plots to see if we expect a significant interaction
+interaction.plot(data1$region, data1$gender, data1$trans_listeners, type = 'b', lwd = 3, 
+                 col = c("red", "blue", "black", "orange", "brown", "violet", "dark green"), 
+                 main = "Interaction Plot of Region and Gender")
+
+# Perform the Two-way ANOVA and get results
+test2 <- aov(data1$trans_listeners ~ data1$region + data1$gender + data1$region*data1$gender)
+Anova(test2, type = 3)
+
+# We performed Tukey comparisons and discussed the results below, though we omitted the code as the results take up too much space
+# plot(TukeyHSD(test2), las = 1, cex = 0.8)
+
+myResPlots2(test2)
 ```
 
-*We then performed ANCOVA to predict the transformed last.fm listener variable with the variables year, type, and the interaction between year and type. Based on their p-values which are all lower than 0.05, we can conclude that year, type, and the interaction between year and type are all significant predictors. The model fit is great. The normal quantile plot of the residuals is linear, suggesting that the residuals are normally distributed. The fits vs residuals plot shows no heteroskedasticity and contain minimal outliers.*
-
-*Lastly, we performed a backwards stepwise regression, a kind of multiple regression, to assess which variables and their interactions are significant predictors of the transformed last.fm listeners. We included the variables gender, year, rank, region, and the number of artist appearances, as well as the interaction between gender and year, year and rank, and region and gender. Due to the strong positive correlation between mean_word_syllables and FORCAST, we omitted mean_word_syllables before performing backwards stepwise regression. We used a significance of 0.001 since most of the p-values are very low to begin with. We started out by looking at the p-values of the interaction terms, eliminating first the interaction term with the highest p-value.*
+*We then performed a Two-way ANOVA to predict the cube-root of last.fm listeners (transformed version) by gender, region, and their interaction. The interaction plot indicates that there is an interaction between region and gender, as the lines are not parallel. In the Two-way ANOVA, we find that region and gender are not significant indicators by themselves (p-value above 0.05); however, their interaction has a significant p-value at the 0.05 confidence level (approx. 0.030). The plot of two-way Tukey comparisons shows that there is a significant difference in three factor combinations: female is preferred over male in the U.K., female is preferred over male in the U.S., and female in the U.S. has more listeners than male in the U.K. The residuals seem to be approximately normally distributed as the normal quantile plot is linear, and the plot of fits versus residuals has only one significant outlier, though since there are many observations, this is negligible. There is also no evidence of heteroskedasticity as the standard deviation is more or less constant across different fitted values. Overall, the model assumptions have been reasonably met.*
 
 ### GLM and Backwards Stepwise Regression
+
+*Lastly, we performed a backwards stepwise regression to assess which variables and their interactions are significant predictors of the transformed last.fm listeners. We included the variables gender, year, rank, region, and the number of artist appearances, as well as the interaction between gender and year, year and rank, and region and gender. Due to the strong positive correlation between mean_word_syllables and FORCAST, we omitted mean_word_syllables before performing backwards stepwise regression. We used a significance of 0.001 since most of the p-values are very low to begin with. We started out by looking at the p-values of the interaction terms, eliminating first the interaction term with the highest p-value.*
+
 ```{r}
 mod1 <- lm(trans_listeners ~ gender + year + rank + region + artist_appearances + gender*year + year*rank + region*gender)
 Anova(mod1, type = 3)
@@ -367,14 +388,8 @@ summary(mod2)
 myResPlots2(mod2)
 ```
 
-*The interaction between year and rank had a p-value of 0.01, greater than our significance 0.001. Thus, we took this term out of our model. In our new model, the remaining two interaction terms had p-values less than 0.001. Thus, we kept these two terms and exitted out of the backwards regression. Our final model thus contains all variables we started out with except for the interaction between year and rank. The R-squared of our final model is 0.2502. Thus, about 25% of the variability in transformed last.fm listeners can be explained by the predictor variables. The normal quantile plot of the studentized residuals is linear, suggesting that the residuals are normally distributed. The fits vs studentized residuals shows no heteroskedasticity and contain minimal outliers. Thus, our final model fit is great!*
+*The interaction between year and rank had a p-value of 0.01, greater than our significance 0.001. Thus, we took this term out of our model. In our new model, the remaining two interaction terms had p-values less than 0.001. Thus, we kept these two terms and ended the backwards regression. Our final model thus contains all variables we started out with except for the interaction between year and rank. Looking at the significant interactions, we see that cube-root of listeners is smaller for U.S. artists than for Canadian artists, the popularity (implied by cube-root of listeners) of groups decreases with year, and the popularity of males decreases with year. The The R-squared of our final model is 0.2502. Thus, about 25% of the variability in transformed last.fm listeners can be explained by the predictor variables. The normal quantile plot of the studentized residuals is linear, suggesting that the residuals are normally distributed. The fits vs studentized residuals shows no heteroskedasticity and contain minimal outliers. Thus, our final model fit is great!*
 
 ## Conclusion
 
-*Overall, we did not find any strong relationship between any of the variables, other than forcast and mean_word_syllables which are obviously related. However, there was a weak negative correlation between the number of unique listeners on last.fm and the rank of the tracks. That is, the lower the rank of the song (or the higher the numeric value of the ranks), the lower the number of unique listeners, which makes intuitive sense. It is also interesting that the FORCAST readability between male and female artists is significantly different. Although we cannot make any strong statements based on these correlations, our results suggest that there are many other variables at play that we have not considered, many of which are probably not available to the public. Determining which tracks make the chart and which don't is a tricky and complex process that must take into account a multitude of factors.*
-
-
-
-
-
-
+*We found that on average, female artists have a higher inverse FORCAST readibility score than male artists, where a higher inverse score corresponds to less complexity. We also found that there is no statistically significant difference in number of last.fm listeners between women and men. Additionally, we found that gender and region, taken alone, are not significant predictors of the cube-root of number of listeners. However, their interaction is significant, and we observe effects such as female artists being more popular than male artists in the U.K as well as the U.S. or female artists in the U.S. having more listeners than male artists in the U.K. Finally, we fit a generalized linear model to predict the cube-root of number of listeners by relevant variables and interactions, and we performed backwards-stepwise regression to get a model with all predictors significant. The results showed us that we can predict the cube-root of number of listeners by taking into account gender, year, rank, region, artist appearances, as well as the interactions gender-year, year-rank, and gender-region. Overall, we now have a sense of what variables influence song popularity (in terms of number of listeners), and we have knowledge of some of the interesting interactions that occur between different factors.*
